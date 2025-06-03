@@ -10,7 +10,7 @@ A modern, responsive analytics dashboard for eBay dropshipping stores.
 - 🎨 Professional UI/UX
 
 ## Usage
-1. Visit the [live dashboard](https://yourusername.github.io/dropmetrics)
+1. Visit the [live dashboard](https://mshehrozsajjad.github.io/dropmetrics)
 2. Upload your eBay store CSV file
 3. Analyze your performance metrics
 

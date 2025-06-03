@@ -1,0 +1,37 @@
+{
+  "name": "dropmetrics",
+  "version": "1.0.0",
+  "description": "Professional eBay Analytics Dashboard",
+  "homepage": "https://mshehrozsajjad.github.io/dropmetrics",
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "predeploy": "npm run build",
+    "deploy": "gh-pages -d build"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "recharts": "^2.7.2",
+    "lucide-react": "^0.263.1",
+    "papaparse": "^5.4.1",
+    "lodash": "^4.17.21"
+  },
+  "devDependencies": {
+    "react-scripts": "5.0.1",
+    "tailwindcss": "^3.3.3",
+    "gh-pages": "^5.0.0"
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  }
+}

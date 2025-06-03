@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Area, AreaChart, ScatterChart, Scatter, RadialBarChart, RadialBar } from 'recharts';
 import { TrendingUp, TrendingDown, Package, DollarSign, ShoppingCart, AlertCircle, Target, Activity, Calendar, BarChart3, Upload, FileText, CheckCircle, XCircle, ArrowUpRight, ArrowDownRight, Info, Download, RefreshCw, Zap, Award, Users, Clock } from 'lucide-react';
 import Papa from 'papaparse';
