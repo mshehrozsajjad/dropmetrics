@@ -92,7 +92,7 @@ out
 dist
 
 # Create React App build output
-/build
+# /build
 
 # Gatsby files
 .cache/
