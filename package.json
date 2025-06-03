@@ -15,7 +15,8 @@
     "recharts": "^2.7.2",
     "lucide-react": "^0.263.1",
     "papaparse": "^5.4.1",
-    "lodash": "^4.17.21"
+    "lodash": "^4.17.21",
+    "@babel/plugin-proposal-private-property-in-object": "^7.21.11"
   },
   "devDependencies": {
     "react-scripts": "5.0.1",
