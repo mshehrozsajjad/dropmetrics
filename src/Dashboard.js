@@ -25,27 +25,87 @@ const Dashboard = () => {
       skipEmptyLines: true
     });
 
+    // Determine month from data
+    let month = 'Unknown';
+    let monthAbbrev = 'Unk';
+    
+    // Try to extract month from the first valid date
+    if (parsedData.data.length > 0) {
+      const sampleDate = parsedData.data.find(row => row['DATE'])?.['DATE'] || '';
+      
+      // Match different date formats
+      const mayMatch = sampleDate.match(/(\d+)\. Mai 2025/);
+      const juneMatch = sampleDate.match(/(\d+)\. June 2025/) || sampleDate.match(/(\d+)\. Jun 2025/);
+      const aprilMatch = sampleDate.match(/(\d+)\. Apr(il)? 2025/);
+      
+      if (mayMatch) {
+        month = 'May';
+        monthAbbrev = 'May';
+      } else if (juneMatch) {
+        month = 'June';
+        monthAbbrev = 'Jun';
+      } else if (aprilMatch) {
+        month = 'April';
+        monthAbbrev = 'Apr';
+      }
+    }
+
     // Clean and process the data
     const processedData = parsedData.data
-      .filter(row => row['SELL PRICE'] && row['BUY PRICE'])
+      .filter(row => {
+        // Make sure SELL PRICE and BUY PRICE exist and are valid
+        let sellPrice = row['SELL PRICE'];
+        let buyPrice = row['BUY PRICE'];
+        
+        // Handle comma-formatted numbers
+        if (typeof sellPrice === 'string') {
+          sellPrice = parseFloat(sellPrice.replace(/,/g, '').replace('"', ''));
+          row['SELL PRICE'] = sellPrice;
+        }
+        
+        if (typeof buyPrice === 'string') {
+          buyPrice = parseFloat(buyPrice.replace(/,/g, '').replace('"', ''));
+          row['BUY PRICE'] = buyPrice;
+        }
+        
+        return sellPrice && !isNaN(sellPrice) && buyPrice && !isNaN(buyPrice);
+      })
       .map(row => {
-        // Parse date - handle German format
-        const dateMatch = row['DATE'].match(/(\d+)\. Mai 2025/);
-        const day = dateMatch ? parseInt(dateMatch[1]) : 1;
+        // Parse date from various formats
+        let day = 1;
+        const dateStr = row['DATE'] || '';
+        
+        // Try to extract day from different date formats
+        const dayMatch = dateStr.match(/(\d+)\./);
+        if (dayMatch) {
+          day = parseInt(dayMatch[1]);
+        }
         
         // Calculate margin percentage
         const marginPercent = ((row['PROFIT'] / row['SELL PRICE']) * 100) || 0;
         
+        // Handle PROFIT field
+        let profit = row['PROFIT'];
+        if (typeof profit === 'string') {
+          profit = parseFloat(profit.replace(/,/g, '').replace('"', ''));
+          row['PROFIT'] = profit;
+        }
+        
         // Fix extreme ROI values (data quality issue)
         let roi = row['ROI'];
-        if (roi > 1000) {
+        if (typeof roi === 'string') {
+          roi = parseFloat(roi.replace(/,/g, '').replace('"', '').replace('%', ''));
+        }
+        
+        if (!roi || isNaN(roi) || roi > 1000) {
           roi = (row['PROFIT'] / row['BUY PRICE'] * 100) || 0;
         }
         
         return {
           ...row,
           day,
-          date: `May ${day}`,
+          date: `${monthAbbrev} ${day}`,
+          month,
           marginPercent,
           roi: roi || 0,
           priceRange: getPriceRange(row['SELL PRICE'])
@@ -109,17 +169,20 @@ const Dashboard = () => {
     avgOrderValue: _.meanBy(data, 'SELL PRICE'),
     avgProfit: _.meanBy(data, 'PROFIT'),
     avgROI: _.meanBy(data.filter(d => d.roi < 1000), 'roi'),
-    profitMargin: (_.sumBy(data, 'PROFIT') / _.sumBy(data, 'SELL PRICE') * 100),
+    profitMargin: _.sumBy(data, 'SELL PRICE') > 0 ? (_.sumBy(data, 'PROFIT') / _.sumBy(data, 'SELL PRICE') * 100) : 0,
     lossCount: data.filter(d => d.PROFIT < 0).length,
     totalLoss: Math.abs(_.sumBy(data.filter(d => d.PROFIT < 0), 'PROFIT'))
   } : {};
 
+  // Get month from first data point for display
+  const dataMonth = data.length > 0 ? data[0].month : 'May';
+  
   // Daily metrics
   const dailyData = _.chain(data)
     .groupBy('day')
     .map((items, day) => ({
       day: parseInt(day),
-      date: `May ${day}`,
+      date: items[0].date, // Use the already formatted date
       orders: items.length,
       revenue: _.sumBy(items, 'SELL PRICE'),
       profit: _.sumBy(items, 'PROFIT'),
@@ -137,7 +200,7 @@ const Dashboard = () => {
       count: items.length,
       profit: _.sumBy(items, 'PROFIT'),
       avgROI: _.meanBy(items.filter(d => d.roi < 1000), 'roi'),
-      percentage: (items.length / data.length * 100)
+      percentage: data.length > 0 ? (items.length / data.length * 100) : 0
     }))
     .value();
 
@@ -325,7 +388,7 @@ const Dashboard = () => {
               </div>
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">DropMetrics</h1>
-                <p className="text-sm text-gray-500">{fileName || 'May 2025 Report'}</p>
+                <p className="text-sm text-gray-500">{fileName || `${dataMonth} 2025 Report`}</p>
               </div>
             </div>
             <div className="flex items-center space-x-4">
@@ -379,36 +442,36 @@ const Dashboard = () => {
             icon={ShoppingCart}
             title="Total Orders"
             value={metrics.totalOrders}
-            subtitle={`${(metrics.totalOrders / dailyData.length).toFixed(1)} orders/day`}
+            subtitle={`${dailyData.length > 0 ? (metrics.totalOrders / dailyData.length).toFixed(1) : '0'} orders/day`}
             color="blue"
           />
           <MetricCard
             icon={DollarSign}
             title="Revenue"
-            value={`${metrics.totalRevenue?.toFixed(2)}`}
-            subtitle={`AOV: ${metrics.avgOrderValue?.toFixed(2)}`}
+            value={metrics.totalRevenue && typeof metrics.totalRevenue === 'number' ? `${metrics.totalRevenue.toFixed(2)}` : '0.00'}
+            subtitle={`AOV: ${metrics.avgOrderValue && typeof metrics.avgOrderValue === 'number' ? metrics.avgOrderValue.toFixed(2) : '0.00'}`}
             color="green"
           />
           <MetricCard
             icon={TrendingUp}
             title="Net Profit"
-            value={`${metrics.totalProfit?.toFixed(2)}`}
-            subtitle={`${metrics.profitMargin?.toFixed(1)}% margin`}
+            value={metrics.totalProfit && typeof metrics.totalProfit === 'number' ? `${metrics.totalProfit.toFixed(2)}` : '0.00'}
+            subtitle={`${metrics.profitMargin && typeof metrics.profitMargin === 'number' ? metrics.profitMargin.toFixed(1) : '0'}% margin`}
             trend={metrics.profitMargin}
             color="purple"
           />
           <MetricCard
             icon={Target}
             title="Average ROI"
-            value={`${metrics.avgROI?.toFixed(1)}%`}
-            subtitle={`${metrics.avgProfit?.toFixed(2)} per order`}
+            value={`${metrics.avgROI && typeof metrics.avgROI === 'number' ? metrics.avgROI.toFixed(1) : '0'}%`}
+            subtitle={`${metrics.avgProfit && typeof metrics.avgProfit === 'number' ? metrics.avgProfit.toFixed(2) : '0.00'} per order`}
             color="orange"
           />
           <div className="hidden 2xl:block">
             <MetricCard
               icon={Activity}
               title="Success Rate"
-              value={`${((1 - metrics.lossCount / metrics.totalOrders) * 100).toFixed(1)}%`}
+              value={`${metrics.totalOrders ? ((1 - metrics.lossCount / metrics.totalOrders) * 100).toFixed(1) : '100'}%`}
               subtitle={`${metrics.lossCount} losses total`}
               color="green"
             />
@@ -516,7 +579,7 @@ const Dashboard = () => {
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium text-gray-700">Success Rate</span>
                     <span className="font-semibold text-purple-600">
-                      {((1 - metrics.lossCount / metrics.totalOrders) * 100).toFixed(1)}%
+                      {metrics.totalOrders ? ((1 - metrics.lossCount / metrics.totalOrders) * 100).toFixed(1) : '100'}%
                     </span>
                   </div>
                   <p className="text-xs text-gray-600 mt-1">Only {metrics.lossCount} losses</p>
@@ -526,7 +589,7 @@ const Dashboard = () => {
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium text-gray-700">Avg Daily Profit</span>
                     <span className="font-semibold text-orange-600">
-                      ${(metrics.totalProfit / dailyData.length).toFixed(2)}
+                      ${dailyData.length > 0 ? (metrics.totalProfit / dailyData.length).toFixed(2) : '0.00'}
                     </span>
                   </div>
                   <p className="text-xs text-gray-600 mt-1">Consistent performance</p>
@@ -654,7 +717,7 @@ const Dashboard = () => {
                   <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
                     <span className="text-sm font-medium text-gray-700">Success Rate</span>
                     <span className="font-semibold text-green-600">
-                      {((1 - metrics.lossCount / metrics.totalOrders) * 100).toFixed(1)}%
+                      {metrics.totalOrders ? ((1 - metrics.lossCount / metrics.totalOrders) * 100).toFixed(1) : '100'}%
                     </span>
                   </div>
                 </div>
@@ -684,7 +747,7 @@ const Dashboard = () => {
             {/* AI-Powered Insights */}
             <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-8 text-white">
               <h3 className="text-2xl font-bold mb-2">AI-Powered Insights</h3>
-              <p className="text-blue-100 mb-6">Based on your May 2025 performance data</p>
+              <p className="text-blue-100 mb-6">Based on your {dataMonth} 2025 performance data</p>
               
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="bg-white/10 backdrop-blur rounded-xl p-4">
@@ -692,7 +755,7 @@ const Dashboard = () => {
                   <p className="text-sm text-blue-100">Profit Margin</p>
                 </div>
                 <div className="bg-white/10 backdrop-blur rounded-xl p-4">
-                  <p className="text-3xl font-bold">${(metrics.totalProfit / dailyData.length).toFixed(0)}</p>
+                  <p className="text-3xl font-bold">${dailyData.length > 0 ? (metrics.totalProfit / dailyData.length).toFixed(0) : '0'}</p>
                   <p className="text-sm text-blue-100">Daily Profit Avg</p>
                 </div>
                 <div className="bg-white/10 backdrop-blur rounded-xl p-4">
@@ -755,7 +818,7 @@ const Dashboard = () => {
                   </div>
                 </div>
                 <p className="text-gray-700 mb-4">
-                  Your daily average of {(metrics.totalOrders / dailyData.length).toFixed(1)} orders 
+                  Your daily average of {dailyData.length > 0 ? (metrics.totalOrders / dailyData.length).toFixed(1) : '0'} orders 
                   shows steady performance. Focus on maintaining this consistency while testing growth strategies.
                 </p>
                 <div className="flex items-center text-sm text-purple-600 font-medium">
@@ -775,7 +838,7 @@ const Dashboard = () => {
                   </div>
                 </div>
                 <p className="text-gray-700 mb-4">
-                  With only {(metrics.lossCount / metrics.totalOrders * 100).toFixed(1)}% loss rate, 
+                  With only {metrics.totalOrders ? (metrics.lossCount / metrics.totalOrders * 100).toFixed(1) : '0'}% loss rate, 
                   your risk management is excellent. Maintain strict pricing rules for items under $10.
                 </p>
                 <div className="flex items-center text-sm text-orange-600 font-medium">
